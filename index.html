@@ -1,0 +1,2459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wings of the Tides — The Epic Migration of Grey Plover PLUSQU BIJ1 | IKI CREAF</title>
+
+  <!-- MapLibre GL JS v5.1.0 (Full Native 3D Sphere Globe & Sky Atmosphere) -->
+  <link href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
+
+  <!-- Turf.js for Catmull-Rom Bezier Spline Flight Path Smoothing -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-glass: rgba(8, 15, 26, 0.84);
+      --bg-glass-heavy: rgba(6, 11, 20, 0.94);
+      --border-glass: rgba(255, 255, 255, 0.14);
+      --accent-gold: #f59e0b;
+      --accent-gold-soft: rgba(245, 158, 11, 0.18);
+      --accent-cyan: #38bdf8;
+      --accent-cyan-soft: rgba(56, 189, 248, 0.16);
+      --accent-teal: #2dd4bf;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --font-serif: 'Cormorant Garamond', Georgia, serif;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      background-color: #040711;
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+    }
+
+    /* Fixed Map Canvas & Atmospheric Diurnal / Dawn Sky Backdrop */
+    #map-wrapper {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      /* Step 0 Dawn Space-Atmosphere Backdrop behind the 3D Sphere */
+      background: radial-gradient(circle at 38% 50%, rgba(251, 146, 60, 0.42) 0%, rgba(190, 24, 93, 0.26) 36%, rgba(15, 23, 42, 0.88) 64%, #030612 100%);
+      transition: background 1.2s ease;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Cinematic Diurnal Sky Tint & Vignette Overlay */
+    #diurnal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 2;
+      transition: background 0.4s ease, box-shadow 0.4s ease;
+      background: radial-gradient(circle at 42% 48%, rgba(251, 146, 60, 0.16) 0%, rgba(190, 24, 93, 0.18) 50%, rgba(2, 6, 23, 0.72) 100%);
+    }
+
+    /* Top Branding & Telemetry HUD */
+    #top-hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 28px;
+      background: linear-gradient(180deg, rgba(3,7,18,0.9) 0%, rgba(3,7,18,0) 100%);
+      pointer-events: none;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      pointer-events: auto;
+    }
+
+    .brand-badge {
+      background: var(--accent-gold-soft);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: var(--accent-gold);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      padding: 5px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .brand-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #fff;
+    }
+
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .telemetry-hud {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-glass);
+      padding: 8px 16px;
+      border-radius: 999px;
+      pointer-events: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    }
+
+    .hud-item {
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font-mono);
+    }
+
+    .hud-label {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hud-value {
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    /* Diurnal 3-Day (71-Hour) Flight Simulation Banner */
+    #diurnal-hud {
+      position: fixed;
+      top: 76px;
+      right: 28px;
+      z-index: 25;
+      background: var(--bg-glass-heavy);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      border-radius: 12px;
+      padding: 14px 18px;
+      width: 330px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      transform: translateY(-10px);
+      pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    #diurnal-hud.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .diurnal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .diurnal-title {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-gold);
+    }
+
+    .diurnal-cycle-pill {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 99px;
+      color: #fff;
+    }
+
+    .diurnal-phase-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 8px 0;
+    }
+
+    .diurnal-icon {
+      font-size: 1.5rem;
+    }
+
+    .diurnal-phase-text {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .diurnal-progress-bar {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .diurnal-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f59e0b, #38bdf8, #818cf8);
+      transition: width 0.15s linear;
+    }
+
+    /* Right-side Chapter Progress Dots */
+    #chapter-nav {
+      position: fixed;
+      right: 22px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(8, 15, 26, 0.6);
+      backdrop-filter: blur(8px);
+      padding: 12px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-glass);
+    }
+
+    .nav-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      border: none;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .nav-dot:hover {
+      background: var(--accent-cyan);
+      transform: scale(1.3);
+    }
+
+    .nav-dot.active {
+      background: var(--accent-gold);
+      transform: scale(1.35);
+      box-shadow: 0 0 10px var(--accent-gold);
+    }
+
+    /* Custom +/- Map Zoom Controls */
+    #map-zoom-controls {
+      position: fixed;
+      right: 18px;
+      bottom: 42px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(8, 15, 26, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border-glass);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .zoom-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .zoom-btn:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: var(--accent-cyan);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .zoom-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Floating Scroll Down Indicator Pill at Bottom Center */
+    #scroll-prompt {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(8, 15, 26, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(245, 158, 11, 0.55);
+      color: #fef3c7;
+      padding: 9px 18px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), 0 0 20px rgba(245, 158, 11, 0.22);
+      transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.25s ease;
+    }
+
+    #scroll-prompt:hover {
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.75), 0 0 24px rgba(56, 189, 248, 0.35);
+    }
+
+    #scroll-prompt.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 16px);
+    }
+
+    .mouse-icon {
+      width: 15px;
+      height: 23px;
+      border: 2px solid var(--accent-gold);
+      border-radius: 9px;
+      position: relative;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .mouse-wheel {
+      width: 3px;
+      height: 5px;
+      background: var(--accent-gold);
+      border-radius: 2px;
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      animation: scroll-wheel-anim 1.6s infinite ease-in-out;
+    }
+
+    @keyframes scroll-wheel-anim {
+      0% { opacity: 1; top: 4px; }
+      70% { opacity: 0.15; top: 12px; }
+      100% { opacity: 0; top: 12px; }
+    }
+
+    .scroll-chevron {
+      display: inline-block;
+      color: var(--accent-gold);
+      font-size: 0.9rem;
+      animation: bounce-down 1.6s infinite ease-in-out;
+    }
+
+    @keyframes bounce-down {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(4px); }
+    }
+
+    /* Next Chapter Footer Prompt inside Cards */
+    .next-chapter-hint {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .next-chapter-hint:hover {
+      color: var(--accent-gold);
+    }
+
+    /* Scrollytelling Story Container */
+    #story-container {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      pointer-events: none;
+    }
+
+    .step {
+      min-height: 105vh;
+      display: flex;
+      align-items: center;
+      padding: 60px 5vw;
+      pointer-events: none;
+    }
+
+    .step.step-center {
+      justify-content: flex-end;
+      min-height: 100vh;
+    }
+
+    .step.step-left {
+      justify-content: flex-start;
+    }
+
+    /* Story Cards */
+    .story-card {
+      width: 100%;
+      max-width: 540px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+      pointer-events: auto;
+      opacity: 0.25;
+      transform: translateY(18px);
+      transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+    }
+
+    .step.active .story-card {
+      opacity: 1;
+      transform: translateY(0);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+
+    /* Hero Card (Step 0) - Circular Bird Portrait Medallion */
+    .hero-card {
+      max-width: 590px;
+      text-align: left;
+      padding: 32px 36px;
+      background: linear-gradient(160deg, rgba(8, 15, 26, 0.88) 0%, rgba(15, 23, 42, 0.78) 100%);
+    }
+
+    .hero-profile-header {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      margin-bottom: 18px;
+    }
+
+    .hero-avatar-wrapper {
+      position: relative;
+      flex-shrink: 0;
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      padding: 3px;
+      background: linear-gradient(135deg, #f59e0b 0%, #38bdf8 55%, #2dd4bf 100%);
+      box-shadow: 0 0 28px rgba(245, 158, 11, 0.42), 0 8px 24px rgba(0, 0, 0, 0.65);
+    }
+
+    .hero-avatar-wrapper::before {
+      content: '';
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(245, 158, 11, 0.55);
+      animation: spin-slow 24s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .hero-avatar-img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center 35%;
+      border: 3px solid #040711;
+      display: block;
+      background: #0f172a;
+      transition: transform 0.35s ease;
+    }
+
+    .hero-avatar-wrapper:hover .hero-avatar-img {
+      transform: scale(1.05);
+    }
+
+    .hero-tracker-pill {
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #040711;
+      border: 1px solid var(--accent-gold);
+      color: var(--accent-gold);
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tracker-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+      animation: blink-dot 1.4s infinite ease-in-out;
+    }
+
+    @keyframes blink-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent-gold);
+      margin-bottom: 6px;
+    }
+
+    .hero-title {
+      font-family: var(--font-serif);
+      font-size: clamp(1.85rem, 2.8vw, 2.45rem);
+      font-weight: 700;
+      line-height: 1.1;
+      color: #ffffff;
+    }
+
+    .hero-subtitle {
+      font-size: 0.94rem;
+      line-height: 1.62;
+      color: #cbd5e1;
+      margin-bottom: 16px;
+    }
+
+    .hero-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 16px 0;
+      padding: 12px 0;
+      border-top: 1px solid var(--border-glass);
+      border-bottom: 1px solid var(--border-glass);
+    }
+
+    .hero-stat-num {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+
+    .hero-stat-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .partner-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-bottom: 20px;
+    }
+
+    .partner-pill {
+      font-size: 0.68rem;
+      font-family: var(--font-mono);
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #030712;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 12px 24px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 6px 24px rgba(245, 158, 11, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(245, 158, 11, 0.55);
+    }
+
+    /* Chapter Metadata Header */
+    .chapter-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .chapter-badge {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-gold);
+      background: var(--accent-gold-soft);
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    .chapter-dates {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--accent-cyan);
+    }
+
+    .chapter-title {
+      font-family: var(--font-serif);
+      font-size: 1.85rem;
+      font-weight: 700;
+      line-height: 1.18;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .chapter-location {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Telemetry Strip inside Card */
+    .telemetry-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      font-family: var(--font-mono);
+    }
+
+    .t-cell-label {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .t-cell-val {
+      font-size: 0.78rem;
+      color: #f8fafc;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    /* Media Figure Frame */
+    .media-frame {
+      position: relative;
+      width: 100%;
+      height: 250px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: #0f172a;
+    }
+
+    .media-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: saturate(1.08) contrast(1.04);
+      transition: transform 0.6s ease;
+    }
+
+    .story-card:hover .media-frame img {
+      transform: scale(1.04);
+    }
+
+    .media-caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 6px 10px;
+      background: linear-gradient(transparent, rgba(2, 6, 23, 0.92));
+      font-size: 0.68rem;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 150-Word Narrative Body */
+    .chapter-narrative {
+      font-size: 0.94rem;
+      line-height: 1.68;
+      color: #e2e8f0;
+      margin-bottom: 18px;
+      font-weight: 400;
+    }
+
+    .chapter-narrative em,
+    .hero-subtitle em,
+    .popup-body em {
+      font-style: italic;
+      color: #fde68a;
+    }
+
+    /* Conservation in Action Callout */
+    .conservation-callout {
+      background: linear-gradient(135deg, rgba(13, 148, 136, 0.16) 0%, rgba(15, 23, 42, 0.75) 100%);
+      border-left: 3px solid var(--accent-teal);
+      border-top: 1px solid rgba(45, 212, 191, 0.22);
+      border-right: 1px solid rgba(45, 212, 191, 0.12);
+      border-bottom: 1px solid rgba(45, 212, 191, 0.12);
+      padding: 14px 16px;
+      border-radius: 0 10px 10px 0;
+      margin-bottom: 18px;
+    }
+
+    .callout-header {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--accent-teal);
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .callout-body {
+      font-size: 0.84rem;
+      line-height: 1.55;
+      color: #cbd5e1;
+    }
+
+    .callout-quote {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.14);
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 0.96rem;
+      color: #fef3c7;
+    }
+
+    /* Interactive Map Marker Snippet Triggers */
+    .marker-snippets-section {
+      border-top: 1px solid var(--border-glass);
+      padding-top: 12px;
+    }
+
+    .snippets-label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .snippet-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .snippet-btn {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #e0f2fe;
+      font-size: 0.75rem;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      padding: 6px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .snippet-btn:hover {
+      background: rgba(56, 189, 248, 0.28);
+      border-color: var(--accent-cyan);
+      transform: translateY(-1px);
+    }
+
+    .flight-replay-btn {
+      width: 100%;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(56, 189, 248, 0.22) 100%);
+      border: 1px solid var(--accent-gold);
+      color: #fef3c7;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .flight-replay-btn:hover {
+      background: rgba(245, 158, 11, 0.35);
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+    }
+
+    /* Custom MapLibre Interactive Markers */
+    .plover-live-marker {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffffff 30%, #f59e0b 70%);
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 20px #f59e0b, 0 0 40px #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      position: relative;
+    }
+
+    .plover-live-marker::after {
+      content: '';
+      position: absolute;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 2px solid rgba(245, 158, 11, 0.65);
+      animation: pulse-ring 1.8s infinite ease-out;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
+
+    /* Pin Symbol Markers (📍) matching the bottom snippet buttons */
+    .poi-marker {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(8, 15, 26, 0.88);
+      border: 2px solid var(--accent-cyan);
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(56, 189, 248, 0.55);
+      transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .poi-marker:hover {
+      transform: scale(1.25) translateY(-2px);
+      background: rgba(56, 189, 248, 0.28);
+      border-color: var(--accent-gold);
+    }
+
+    /* MapLibre Popup Styling */
+    .maplibregl-popup-content {
+      background: rgba(8, 15, 26, 0.95) !important;
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(56, 189, 248, 0.45) !important;
+      border-radius: 10px !important;
+      color: #f8fafc !important;
+      padding: 14px 16px !important;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7) !important;
+      max-width: 290px !important;
+      font-family: var(--font-sans) !important;
+    }
+
+    .maplibregl-popup-tip {
+      border-top-color: rgba(8, 15, 26, 0.95) !important;
+      border-bottom-color: rgba(8, 15, 26, 0.95) !important;
+    }
+
+    .maplibregl-popup-close-button {
+      color: #94a3b8 !important;
+      font-size: 16px !important;
+      padding: 4px 8px !important;
+    }
+
+    .popup-tag {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-gold);
+      margin-bottom: 4px;
+    }
+
+    .popup-title {
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .popup-body {
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+
+    @media (max-width: 768px) {
+      #top-hud {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 14px;
+      }
+      .telemetry-hud {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .story-card, .hero-card {
+        padding: 20px;
+        max-width: 100%;
+      }
+      .hero-profile-header {
+        flex-direction: column;
+        text-align: center;
+      }
+      .hero-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      #chapter-nav {
+        display: none;
+      }
+      #scroll-prompt {
+        bottom: 14px;
+        padding: 7px 14px;
+        font-size: 0.65rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fixed Map & Atmospheric Diurnal Overlay -->
+  <div id="map-wrapper">
+    <div id="map"></div>
+    <div id="diurnal-overlay"></div>
+  </div>
+
+  <!-- Top Branding & Live Bird Telemetry HUD -->
+  <header id="top-hud">
+    <div class="brand-cluster">
+      <span class="brand-badge">IKI CREAF</span>
+      <div>
+        <span class="brand-title">Climate-Resilient East Atlantic Flyway</span>
+        <span class="brand-sub">Wetlands International • CWSS • BirdEyes • BirdLife • IBAP</span>
+      </div>
+    </div>
+
+    <div class="telemetry-hud">
+      <div class="hud-item">
+        <span class="hud-label">Individual ID</span>
+        <span class="hud-value" id="hud-bird">PLUSQU BIJ1 (<em>Pluvialis squatarola</em>)</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Coordinates</span>
+        <span class="hud-value" id="hud-coords">11.27°N, 15.84°W</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Stage / Status</span>
+        <span class="hud-value" id="hud-stage">3D Globe at Dawn</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3-Day (71-Hour) Diurnal Non-Stop Flight HUD (Bijagós -> Brittany) -->
+  <aside id="diurnal-hud">
+    <div class="diurnal-header">
+      <span class="diurnal-title">71-Hour Non-Stop Oceanic Dash</span>
+      <span class="diurnal-cycle-pill" id="diurnal-cycle-counter">Day 1 / 3</span>
+    </div>
+    <div class="diurnal-phase-row">
+      <span class="diurnal-icon" id="diurnal-icon">☀️</span>
+      <div>
+        <div class="diurnal-phase-text" id="diurnal-phase-name">Day 1 • Daylight Flight</div>
+        <div style="font-size: 0.72rem; color: #94a3b8;" id="diurnal-subtext">Bijagós to Baie de Morlaix (4,500+ km in 3 Days)</div>
+      </div>
+    </div>
+    <div class="diurnal-progress-bar">
+      <div class="diurnal-progress-fill" id="diurnal-progress"></div>
+    </div>
+  </aside>
+
+  <!-- Right-hand Quick Navigation Dots -->
+  <nav id="chapter-nav" aria-label="Story Chapters"></nav>
+
+  <!-- Dedicated +/- Map Zoom Buttons -->
+  <div id="map-zoom-controls" aria-label="Map Zoom Controls">
+    <button class="zoom-btn" id="btn-zoom-in" title="Zoom in on map" aria-label="Zoom in">+</button>
+    <button class="zoom-btn" id="btn-zoom-out" title="Zoom out on map" aria-label="Zoom out">&minus;</button>
+  </div>
+
+  <!-- Persistent Floating Scroll Down Prompt -->
+  <button id="scroll-prompt" onclick="scrollToNextStep()" title="Scroll down to advance to the next chapter">
+    <span class="mouse-icon"><span class="mouse-wheel"></span></span>
+    <span id="scroll-prompt-text">Scroll Down to Follow the Migration</span>
+    <span class="scroll-chevron">↓</span>
+  </button>
+
+  <!-- Scrollytelling Narrative Steps -->
+  <main id="story-container"></main>
+
+  <script>
+    /********************************************************************
+     * 1. CONFIGURATION, LOCAL CHAPTER IMAGES & TELEMETRY DATASET
+     ********************************************************************/
+    /**
+     * Local Folder Image Convention:
+     * Every chapter loads its image from the same folder using:
+     *   - Step 0: "grey-plover-chapter-0.jpg" (falls back to "step0-plover-tracker.jpg" or SVG)
+     *   - Chapter 1..10: "grey-plover-chapter-1.jpg" .. "grey-plover-chapter-10.jpg"
+     */
+    const STEP0_LOCAL_FILENAME = "grey-plover-chapter-0.jpg";
+    const STEP0_ALT_FILENAME = "step0-plover-tracker.jpg";
+
+    const STEP0_FALLBACK_SVG = `data:image/svg+xml;utf8,` + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f59e0b"/>
+            <stop offset="45%" stop-color="#fb7185"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <linearGradient id="mud" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1e293b"/>
+            <stop offset="50%" stop-color="#334155"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+        </defs>
+        <rect width="400" height="400" fill="url(#sky)"/>
+        <circle cx="290" cy="110" r="48" fill="#fef08a" opacity="0.85"/>
+        <rect y="255" width="400" height="145" fill="url(#mud)"/>
+        <ellipse cx="200" cy="310" rx="150" ry="18" fill="#38bdf8" opacity="0.28"/>
+        <g transform="translate(95, 130)">
+          <line x1="95" y1="125" x2="90" y2="178" stroke="#0f172a" stroke-width="5"/>
+          <line x1="118" y1="125" x2="128" y2="175" stroke="#0f172a" stroke-width="5"/>
+          <path d="M40,95 Q85,55 150,82 Q182,96 205,115 Q145,135 85,126 Q52,120 40,95 Z" fill="#cbd5e1" stroke="#0f172a" stroke-width="3"/>
+          <path d="M68,85 Q115,68 165,94 Q130,115 78,108 Z" fill="#475569"/>
+          <circle cx="52" cy="64" r="24" fill="#e2e8f0" stroke="#0f172a" stroke-width="3"/>
+          <circle cx="44" cy="60" r="5" fill="#0f172a"/>
+          <path d="M28,62 L4,70 L28,72 Z" fill="#0f172a"/>
+          <rect x="96" y="56" width="28" height="12" rx="3" fill="#0284c7" stroke="#fef08a" stroke-width="2"/>
+          <line x1="122" y1="56" x2="162" y2="22" stroke="#fef08a" stroke-width="2.5"/>
+          <circle cx="162" cy="22" r="4" fill="#f59e0b"/>
+        </g>
+      </svg>
+    `);
+
+    // Exact 110 filtered telemetry points [lon, lat, fid, timestamp] from grey-plover-gps-points-100km
+    const RAW_TRACK_POINTS = [
+      [-15.83547, 11.27113, 1, "2025-11-21 04:01"],
+      [-16.17956, 12.79004, 2, "2026-05-06 22:00"],
+      [-16.58446, 13.86143, 3, "2026-05-07 00:00"],
+      [-16.94259, 15.49114, 4, "2026-05-07 02:00"],
+      [-16.59515, 16.86249, 5, "2026-05-07 04:00"],
+      [-16.03453, 18.02177, 6, "2026-05-07 06:00"],
+      [-16.04469, 19.35304, 7, "2026-05-07 10:00"],
+      [-14.95513, 20.93304, 8, "2026-05-07 12:00"],
+      [-14.30199, 22.08821, 9, "2026-05-07 14:00"],
+      [-13.65521, 23.41476, 10, "2026-05-07 16:00"],
+      [-13.26169, 24.56847, 11, "2026-05-07 18:00"],
+      [-11.42686, 27.41066, 12, "2026-05-07 22:00"],
+      [-10.83255, 28.95094, 13, "2026-05-08 02:00"],
+      [-10.48139, 29.83630, 14, "2026-05-08 04:00"],
+      [-10.26720, 30.72204, 15, "2026-05-08 06:01"],
+      [-9.81641, 32.58458, 16, "2026-05-08 10:01"],
+      [-9.20971, 33.57269, 17, "2026-05-08 12:01"],
+      [-8.68687, 34.71167, 18, "2026-05-08 14:00"],
+      [-8.27337, 35.87849, 19, "2026-05-08 16:01"],
+      [-8.22869, 37.17989, 20, "2026-05-08 18:00"],
+      [-7.99623, 38.46549, 21, "2026-05-08 20:00"],
+      [-7.74094, 39.78138, 22, "2026-05-08 22:00"],
+      [-7.31672, 40.98722, 23, "2026-05-09 00:00"],
+      [-7.13136, 42.34609, 24, "2026-05-09 02:00"],
+      [-6.00608, 44.91627, 25, "2026-05-09 06:01"],
+      [-4.76692, 45.90288, 26, "2026-05-09 10:01"],
+      [-4.24083, 46.76361, 27, "2026-05-09 12:00"],
+      [-3.75443, 47.62875, 28, "2026-05-09 14:00"],
+      [-4.06135, 48.61708, 29, "2026-05-09 17:00"],
+      [-2.96989, 49.21294, 30, "2026-05-15 16:45"],
+      [-1.62391, 49.75379, 31, "2026-05-15 18:45"],
+      [-0.56416, 50.50605, 32, "2026-05-15 20:30"],
+      [0.58700, 51.18641, 33, "2026-05-15 22:15"],
+      [1.50339, 52.03018, 34, "2026-05-16 00:15"],
+      [2.86804, 52.46980, 35, "2026-05-16 02:00"],
+      [4.37636, 52.77439, 36, "2026-05-16 03:45"],
+      [5.65565, 53.32196, 37, "2026-05-16 09:30"],
+      [7.17861, 53.62472, 38, "2026-05-18 09:15"],
+      [8.75308, 53.97806, 39, "2026-05-18 11:00"],
+      [9.76655, 54.73949, 40, "2026-05-28 16:15"],
+      [11.19363, 55.22093, 41, "2026-05-28 18:45"],
+      [12.66965, 55.64424, 42, "2026-05-28 20:30"],
+      [14.14333, 56.17103, 43, "2026-05-28 22:15"],
+      [15.69179, 56.48937, 44, "2026-05-28 23:45"],
+      [17.35065, 56.80994, 45, "2026-05-29 01:14"],
+      [18.92519, 57.14353, 46, "2026-05-29 06:00"],
+      [20.70518, 57.42700, 47, "2026-05-29 07:45"],
+      [22.43236, 57.90507, 48, "2026-05-29 09:30"],
+      [24.15594, 58.12450, 49, "2026-05-29 10:45"],
+      [25.78597, 58.56162, 50, "2026-05-29 16:15"],
+      [27.40454, 58.92601, 51, "2026-05-29 17:45"],
+      [31.37655, 60.11731, 52, "2026-05-29 23:14"],
+      [32.67968, 60.86352, 53, "2026-05-30 07:00"],
+      [34.42459, 61.19262, 54, "2026-05-30 10:00"],
+      [34.46221, 62.25725, 55, "2026-05-30 16:00"],
+      [35.61503, 63.00562, 56, "2026-05-30 19:30"],
+      [40.19931, 65.04139, 57, "2026-05-31 10:45"],
+      [42.42405, 65.53236, 58, "2026-06-05 18:28"],
+      [44.05717, 66.18314, 59, "2026-06-05 20:00"],
+      [45.63695, 66.84806, 60, "2026-06-05 21:00"],
+      [48.27458, 67.54615, 61, "2026-06-05 22:30"],
+      [50.39571, 68.06242, 62, "2026-06-06 01:00"],
+      [53.05614, 68.39941, 63, "2026-06-06 03:30"],
+      [55.53023, 68.51582, 64, "2026-07-24 08:01"],
+      [57.90818, 68.76572, 65, "2026-07-25 12:01"],
+      [54.26247, 68.53657, 66, "2026-08-01 05:02"],
+      [51.66621, 68.69419, 67, "2026-08-01 07:00"],
+      [48.77512, 68.63336, 68, "2026-08-01 09:00"],
+      [46.34615, 68.35585, 69, "2026-08-01 11:00"],
+      [44.74269, 67.51675, 70, "2026-08-01 19:00"],
+      [42.66904, 66.84407, 71, "2026-08-01 21:00"],
+      [40.54121, 66.44403, 72, "2026-08-02 00:01"],
+      [38.52707, 65.88386, 73, "2026-08-06 20:00"],
+      [26.26729, 66.62215, 74, "2026-08-07 06:01"],
+      [23.48745, 66.20660, 75, "2026-08-07 08:01"],
+      [21.41831, 65.51541, 76, "2026-08-07 11:01"],
+      [22.77987, 64.37768, 77, "2026-08-07 13:01"],
+      [21.45260, 63.27728, 78, "2026-08-07 16:01"],
+      [20.98108, 62.30219, 79, "2026-08-07 18:00"],
+      [20.33906, 61.22905, 80, "2026-08-07 20:01"],
+      [17.52810, 58.68871, 81, "2026-08-08 07:02"],
+      [16.32895, 57.24360, 82, "2026-08-11 07:02"],
+      [14.85897, 56.42566, 83, "2026-08-15 10:01"],
+      [13.92467, 55.12356, 84, "2026-08-15 18:01"],
+      [12.19357, 54.11647, 85, "2026-08-15 22:01"],
+      [9.52075, 54.04893, 86, "2026-08-16 02:01"],
+      [7.93009, 53.99152, 87, "2026-09-13 14:50"],
+      [6.67449, 53.46527, 88, "2026-09-13 16:30"],
+      [5.19384, 53.02242, 89, "2026-09-13 18:40"],
+      [4.25634, 52.23570, 90, "2026-09-13 20:30"],
+      [3.08885, 51.57711, 91, "2026-09-13 22:40"],
+      [1.96726, 50.99392, 92, "2026-09-14 08:01"],
+      [1.00299, 50.29909, 93, "2026-09-14 11:50"],
+      [0.03173, 49.60280, 94, "2026-09-14 14:10"],
+      [-0.62015, 48.73912, 95, "2026-09-14 16:20"],
+      [-1.32624, 47.84927, 96, "2026-09-14 18:00"],
+      [-2.24907, 47.10566, 97, "2026-09-15 16:30"],
+      [-2.54958, 46.15788, 98, "2026-09-15 17:40"],
+      [-3.06997, 45.29776, 99, "2026-09-15 19:10"],
+      [-3.64015, 44.45321, 100, "2026-09-15 20:40"],
+      [-4.15568, 43.60596, 101, "2026-09-15 22:00"],
+      [-5.47097, 43.43809, 102, "2026-09-16 02:00"],
+      [-6.68964, 43.69792, 103, "2026-09-16 07:00"],
+      [-5.69340, 44.33642, 104, "2026-09-16 10:00"],
+      [-4.73111, 45.03940, 105, "2026-09-16 12:53"],
+      [-3.81645, 45.69685, 106, "2026-09-16 15:30"],
+      [-2.77597, 46.28257, 107, "2026-09-16 17:50"],
+      [-1.84373, 46.94355, 108, "2026-09-16 20:01"],
+      [-0.53359, 46.82420, 109, "2026-10-02 12:20"],
+      [-0.55556, 45.90479, 110, "2026-10-02 17:21"]
+    ];
+
+    /********************************************************************
+     * 2. STORYMAP CHAPTERS (Step 0 3D Dawn Globe + Chapters 1 to 10)
+     ********************************************************************/
+    const STORY_CHAPTERS = [
+      {
+        step: 0,
+        isHero: true,
+        badge: "Step 0 • 3D Globe at Dawn",
+        title: "Wings of the Tides: The Planetary Odyssey of PLUSQU BIJ1",
+        subtitle: "Meet <strong>PLUSQU BIJ1</strong>—a satellite-tracked Grey Plover (<em>Pluvialis squatarola</em>) carrying solar transmitter <code>060038865</code> on its back. From the tropical mangrove labyrinths of Guinea-Bissau to the ice-rimmed shores of the Russian Kara Sea, follow 325 days of its life across a chain of climate-vulnerable coastal wetlands.",
+        center: [-15.83547, 11.27113],
+        zoom: 1.75,
+        pitch: 0,
+        bearing: 0,
+        trackIndex: 0
+      },
+      {
+        step: 1,
+        badge: "Chapter 01 • Wintering Refuge",
+        title: "Where the Mangroves Breathe: The Tangled Gold of Bijagós",
+        location: "Ilha de Formosa & Urok Islands, Arquipélago dos Bijagós, Guinea-Bissau",
+        dates: "Nov 21, 2025 – May 6, 2026",
+        duration: "166.6 Days (#1)",
+        fixes: "1,502 GPS Fixes",
+        protectedArea: "Bijagós UNESCO Biosphere Reserve & Ramsar Site",
+        center: [-15.8588, 11.3070],
+        zoom: 10.6,
+        pitch: 52,
+        bearing: -18,
+        trackIndex: 0,
+        mediaUrl: "grey-plover-chapter-1.jpg",
+        mediaCredit: "Grey Plovers & Bijagó Shell Harvesters • IKI CREAF",
+        narrative: "For one hundred and sixty-six sun-drenched days, Grey Plover (<em>Pluvialis squatarola</em>) PLUSQU BIJ1 lives by the lunar pulse of the Arquipélago dos Bijagós. As the Atlantic tide retreats from Ilha de Formosa, it unveils a glistening banquet of tropical mudflats threaded by labyrinthine <em>Rhizophora</em> mangrove roots, shared peacefully with local Bijagó women harvesting cockles and oysters. Here, our plover patrols the warm silt with deliberate, stop-start grace, watching for the subtle surface dimples of West African fiddler crabs (<em>Uca tangeri</em>), marine worms, and thin-shelled bivalves. Throughout the northern winter, its physiology is in quiet maintenance mode, wearing muted ash-grey plumage. Yet as April wanes, an ancient photoperiodic cue triggers hyperphagia—a voracious feeding frenzy. Subcutaneous lipid stores swell, transforming the bird into a biological fuel tank while its pectoral muscles thicken for the trans-continental leap ahead.",
+        calloutPartner: "IBAP (Instituto da Biodiversidade e das Áreas Protegidas) & PRCM",
+        calloutText: "In Guinea-Bissau's Urok Islands and Bijagós Biosphere Reserve, IBAP and CREAF partners work alongside indigenous Bijagó communities to restore degraded mangrove belts, monitor shorebird populations, and safeguard sustainable artisanal shellfish grounds against rising sea levels.",
+        calloutQuote: "“Wetlands are not just water and reeds. They’re the lungs of our community, our markets, our stories.” — Louise Sarr, Saloum Delta, Senegal",
+        markers: [
+          {
+            coords: [-15.83547, 11.27113],
+            tag: "Telemetry Deployment • FID 1",
+            title: "Ilha de Formosa Tagging Site",
+            body: "On Nov 21, 2025 at 04:01 UTC, transmitter 060038865 logged its first fix on <em>Pluvialis squatarola</em> at 32.4°C on the low-tide flats of Formosa Island."
+          },
+          {
+            coords: [-15.9250, 11.4320],
+            tag: "Community Conservation",
+            title: "Urok Islands & Shell Harvesters",
+            body: "Co-managed by local tabanka villages and IBAP, protecting 50,000+ hectares of intertidal mudflats where sustainable shellfish harvesting and wintering waders coexist."
+          },
+          {
+            coords: [-15.7620, 11.2350],
+            tag: "Trophic Ecology",
+            title: "Intertidal Benthic Banquet",
+            body: "Rich densities of fiddler crabs (<em>Uca tangeri</em>) and polychaetes enable Grey Plovers to accumulate 40–50% body fat before departure."
+          }
+        ]
+      },
+      {
+        step: 2,
+        badge: "Chapter 02 • First European Landfall",
+        title: "Three Suns and Three Moons: Across the Saharan Furnace to Celtic Tides",
+        location: "Baie de Morlaix, Finistère, Brittany, France",
+        dates: "May 9, 2026 – May 15, 2026",
+        duration: "6.0 Days (#8)",
+        fixes: "564 GPS Fixes",
+        protectedArea: "Réserve Naturelle de la Baie de Morlaix / Natura 2000",
+        center: [-3.9338, 48.6924],
+        zoom: 10.8,
+        pitch: 55,
+        bearing: 24,
+        trackIndex: 28,
+        hasDiurnalFlight: true,
+        mediaUrl: "grey-plover-chapter-2.jpg",
+        mediaCredit: "Trans-Saharan High-Altitude Flight & Brittany Landfall • CREAF Flyway Network",
+        narrative: "On the evening of May 6, PLUSQU BIJ1 launches into the tropical dusk, climbing over two and a half kilometers into the cool trade winds. What follows is a breathtaking feat of endurance: in just 71 hours—three days and three nights of non-stop flight—this <em>Pluvialis squatarola</em> covers over 4,500 kilometers across Senegal, Mauritania, the blistering Saharan dunes, the Moroccan coast, Iberia, and the open swell of the Bay of Biscay. Soaring up to 7,043 meters above the desert to escape scorching daytime heat, the plover burns both fat and protein to stay aloft and hydrated. Touching down exhausted in Brittany’s Baie de Morlaix on May 9, its digestive tract is atrophied from days of fasting. Over six restorative days among sheltered Breton mudflats and eelgrass beds (<em>Zostera</em>), the bird rebuilds its gut lining, quenches its physiological thirst, and prepares to push onward to the Wadden Sea.",
+        calloutPartner: "European Natura 2000 Network & BirdLife Flyway Partners",
+        calloutText: "CREAF bridges West African Ramsar wetlands with European Natura 2000 estuaries like the Baie de Morlaix. Protecting disturbance-free high-tide roosts in Brittany is critical so exhausted trans-Saharan migrants can recover without burning precious survival energy.",
+        calloutQuote: "“Lorsque les oiseaux reviennent, cela signifie que notre zone humide respire encore. C'est ce que nous protégeons chaque jour.” — Feitmatt M'Beirick, Banc d'Arguin",
+        markers: [
+          {
+            coords: [-14.95513, 20.93304],
+            tag: "High-Altitude Record • FID 8",
+            title: "7,043m Above the Sahara",
+            body: "Over Mauritania on May 7 at 12:00 UTC, <em>Pluvialis squatarola</em> climbed to 7,043 meters at 128 km/h (35.7 m/s) to ride cool tailwinds above desert heat."
+          },
+          {
+            coords: [-4.06135, 48.61708],
+            tag: "European Landfall • FID 29",
+            title: "Touchdown at Finistère (71 Hours)",
+            body: "After 4,500+ km and 3 days non-stop from Guinea-Bissau, the plover made landfall on the Breton coast on May 9 at 17:00 UTC."
+          },
+          {
+            coords: [-3.9338, 48.6924],
+            tag: "Physiological Recovery",
+            title: "Baie de Morlaix Eelgrass Flats",
+            body: "Six days of undisturbed foraging among <em>Zostera</em> beds allowed the bird to regenerate digestive organs shrunk during its 71-hour marathon."
+          }
+        ]
+      },
+      {
+        step: 3,
+        badge: "Chapter 03 • Spring Refueling Hub",
+        title: "The Engine of the Flyway: Feasting on the Silver Horizon",
+        location: "Dithmarschen Coast, Büsum & Eider Estuary, Schleswig-Holstein, Germany",
+        dates: "May 18, 2026 – May 28, 2026",
+        duration: "10.2 Days (#5)",
+        fixes: "978 GPS Fixes",
+        protectedArea: "Schleswig-Holstein Wadden Sea National Park (UNESCO World Heritage)",
+        center: [8.8276, 54.2188],
+        zoom: 10.2,
+        pitch: 50,
+        bearing: -15,
+        trackIndex: 38,
+        mediaUrl: "grey-plover-chapter-3.jpg",
+        mediaCredit: "Wadden Sea Tidal Flats • Common Wadden Sea Secretariat (CWSS / WSFI)",
+        narrative: "After a brief two-day reconnaissance pause in the Dutch Wadden Sea, PLUSQU BIJ1 arrives at the biological powerhouse of the East Atlantic Flyway: the Dithmarschen tidal flats of Schleswig-Holstein. Here, the world’s largest unbroken system of intertidal sand and mudflats stretches to the horizon. Now dressed in striking <em>Pluvialis squatarola</em> breeding regalia—a jet-black face and breast framed by a snow-white crown and silver-spangled back—the plover has just ten days to double its body mass. Following the ebbing North Sea waters around Büsum and the Eider Estuary, it gorges relentlessly on Baltic tellin bivalves (<em>Macoma balthica</em>) and ragworms (<em>Hediste diversicolor</em>). Every calorie harvested from this UNESCO World Heritage mud is converted into high-octane lipid fuel, essential not only to power the 3,500-kilometer flight across the Baltic and boreal Russia, but also to survive the frozen opening days on the Arctic breeding grounds.",
+        calloutPartner: "Common Wadden Sea Secretariat (CWSS) & Wadden Sea Flyway Initiative",
+        calloutText: "As the lead coordinating partner of the IKI CREAF project, CWSS links trilateral Wadden Sea conservation (Denmark, Germany, Netherlands) with 11 African coastal states—ensuring that climate adaptation and wetland monitoring span the entire flyway.",
+        calloutQuote: "“Les oiseaux nous disent quand il y a les changements.” — Thioro Sylla, Community Monitor, Senegal",
+        markers: [
+          {
+            coords: [5.65565, 53.32196],
+            tag: "Brief Stopover • FID 37",
+            title: "Dutch Wadden Sea Pitstop",
+            body: "Stopped for 2.1 days along the Frisian coast (May 16–18) before shifting northeast to the macrobenthos-rich German flats."
+          },
+          {
+            coords: [8.8276, 54.2188],
+            tag: "Refueling Core • FID 2856",
+            title: "Dithmarschen & Eider Estuary",
+            body: "Over 10.2 days (978 GPS fixes), the bird fed intensively on <em>Macoma balthica</em> clams and <em>Hediste diversicolor</em> polychaete worms."
+          },
+          {
+            coords: [8.75308, 53.97806],
+            tag: "Climate Vulnerability",
+            title: "Rising Seas & Sediment Balance",
+            body: "CREAF scientists monitor whether natural sedimentation in the Wadden Sea can keep pace with accelerating sea-level rise."
+          }
+        ]
+      },
+      {
+        step: 4,
+        badge: "Chapter 04 • Arctic Breeding Grounds",
+        title: "Cradle of the Midnight Sun: Vigil on the Lichen Tundra",
+        location: "Malozemelskaya Tundra & Pechora Delta, Nenets Autonomous Okrug, Russia",
+        dates: "June 6, 2026 – July 24, 2026",
+        duration: "48.2 Days (#2)",
+        fixes: "1,670 GPS Fixes",
+        protectedArea: "Nenetskiy State Nature Reserve / Pechora Sea Coast",
+        center: [55.4073, 68.4118],
+        zoom: 9.2,
+        pitch: 48,
+        bearing: 12,
+        trackIndex: 63,
+        mediaUrl: "grey-plover-chapter-4.jpg",
+        mediaCredit: "Arctic Polygon Tundra • BirdEyes / University of Groningen Telemetry Research",
+        narrative: "Sweeping northeast across Sweden, the Gulf of Bothnia, Karelia, and the White Sea, PLUSQU BIJ1 crosses the Arctic Circle to claim its ancestral territory on the Malozemelskaya Tundra. Under twenty-four hours of continuous polar daylight, the landscape is a mosaic of thawing permafrost polygons, silvery reindeer moss (<em>Cladonia</em>), and dwarf willow (<em>Salix</em>). Here, the <em>Pluvialis squatarola</em> physiology shifts from endurance athlete to devoted parent. Across forty-eight intense days, it performs plaintive, flute-like aerial display flights, scrapes a shallow hollow lined with lichen, and shares the twenty-seven-day incubation of four cryptically mottled eggs. Its black-and-silver plumage becomes invisible against frost-heaved peat whenever Arctic foxes (<em>Vulpes lagopus</em>) or skuas patrol overhead. Timed to perfection, the precocial chicks hatch just as crane flies and chironomid midges erupt from the tundra pools, fueling a frantic race to fledge before the brief polar summer vanishes.",
+        calloutPartner: "BirdEyes (University of Groningen) & Global Flyway Ecology Network",
+        calloutText: "Using solar-powered satellite tags weighing just a few grams, BirdEyes researchers at the University of Groningen track precise incubation rhythms and habitat use—revealing how rapid Arctic warming and 'shrubification' are reshaping tundra nesting grounds.",
+        calloutQuote: "“Participating in international conservation through this initiative has broadened my perspective and deepened my sense of purpose.” — Emmanuel Nii Attram Taye, Ghana",
+        markers: [
+          {
+            coords: [55.4073, 68.4118],
+            tag: "Nesting Territory • FID 4752",
+            title: "Malozemelskaya Tundra Scrape",
+            body: "1,670 tightly clustered GPS fixes over 48.2 days pinpoint the <em>Pluvialis squatarola</em> defended nesting territory and 27-day incubation vigil."
+          },
+          {
+            coords: [53.05614, 68.39941],
+            tag: "Protected Sanctuary • FID 63",
+            title: "Nenetskiy State Nature Reserve",
+            body: "Vital deltaic and coastal tundra habitats at the mouth of the Pechora River supporting breeding waders and waterfowl."
+          },
+          {
+            coords: [55.53023, 68.51582],
+            tag: "Phenological Match • FID 64",
+            title: "The Arctic Insect Emergence",
+            body: "Chicks hatch with downy camouflage and immediately self-feed on emerging <em>Tipulidae</em> larvae and midges under 24-hour sunlight."
+          }
+        ]
+      },
+      {
+        step: 5,
+        badge: "Chapter 05 • High Arctic Apex",
+        title: "At the Edge of the Pack Ice: Gathering by the Kara Sea",
+        location: "Yugorsky Peninsula & Vaygach Strait Coast, Nenets / Yamal Border, Russia",
+        dates: "July 24, 2026 – July 31, 2026",
+        duration: "7.1 Days (#7)",
+        fixes: "91 GPS Fixes",
+        protectedArea: "Vaygach Strait / Kara Sea Arctic Coast",
+        center: [57.8545, 68.7383],
+        zoom: 9.5,
+        pitch: 52,
+        bearing: 35,
+        trackIndex: 64,
+        mediaUrl: "grey-plover-chapter-5.jpg",
+        mediaCredit: "High Arctic Coastal Lagoons • Kara Sea Frontier",
+        narrative: "With breeding duties concluded in late July, PLUSQU BIJ1 does not immediately fly south; instead, it makes a surprising 120-kilometer hop northeastward to the icy rim of the Yugorsky Peninsula. Here, at 68.768° North—the absolute northernmost apex of its entire annual cycle—our <em>Pluvialis squatarola</em> joins small post-breeding flocks along the gravel spits and brackish lagoons bordering the Kara Sea and Vaygach Strait. Cold fog rolls off drifting polar pack ice while the sun begins to dip toward the horizon for the first time in two months. The plover’s breeding plumage is now frayed and sun-bleached from weeks of tundra exposure. For seven brisk days, it probes the cold marine wrack and tundra pool margins for <em>Gammarus</em> amphipods and larval dipterans, laying down an initial buffer of subcutaneous fat before the first sub-polar August gales lock the coastline in frost.",
+        calloutPartner: "International Waterbird Census (IWC) & Flyway Monitoring",
+        calloutText: "Satellite tracks like PLUSQU BIJ1 uncover previously overlooked post-breeding staging lagoons at the edge of the Kara Sea. Connecting these high-latitude data points with winter counts in West Africa allows Wetlands International to assess population trends across the entire flyway.",
+        calloutQuote: "“Every single coastal lagoon from the Kara Sea to Guinea-Bissau is a stepping stone; lose one, and the chain breaks.” — CREAF Scientific Dossier",
+        markers: [
+          {
+            coords: [57.90818, 68.76572],
+            tag: "Northern Apex • FID 65",
+            title: "68.768°N — Peak Latitude",
+            body: "Recorded on July 25, 2026 at 12:01 UTC, marking the northernmost coordinate reached by <em>Pluvialis squatarola</em> PLUSQU BIJ1 during its 325-day track."
+          },
+          {
+            coords: [57.8545, 68.7383],
+            tag: "Post-Breeding Staging",
+            title: "Yugorsky Coastal Lagoons",
+            body: "For 7.1 days, adult plovers congregated along sheltered spits bordering the Vaygach Strait to feed on marine amphipods."
+          },
+          {
+            coords: [54.26247, 68.53657],
+            tag: "Westward Turn • FID 66",
+            title: "Retreat Ahead of Freeze-Up",
+            body: "On August 1 at 05:02 UTC, the bird launched westward at 55 km/h as early autumn temperatures began dropping across the Kara Sea."
+          }
+        ]
+      },
+      {
+        step: 6,
+        badge: "Chapter 06 • Southbound Departure",
+        title: "The Turning of the Wind: Southward from Chesha Bay",
+        location: "Cheshskaya Bay & Kanin Peninsula, Nenets, Russia",
+        dates: "Aug 1, 2026 – Aug 6, 2026",
+        duration: "4.8 Days (#9)",
+        fixes: "72 GPS Fixes",
+        protectedArea: "Chesha Bay Marine Coastal Transition Zone",
+        center: [40.4695, 66.4106],
+        zoom: 8.6,
+        pitch: 46,
+        bearing: -28,
+        trackIndex: 71,
+        mediaUrl: "grey-plover-chapter-6.jpg",
+        mediaCredit: "Sub-Arctic Coastal Marshes • White Sea / Barents Sea Bottleneck",
+        narrative: "As August dawns, an unmistakable restlessness sweeps the northern coast. Departing the Yugorsky Peninsula on August 1, PLUSQU BIJ1 races westward along the Barents Sea rim, skirting the Pechora Sea before dropping into the vast, shallow amphitheater of Cheshskaya Bay and the White Sea entrance. For nearly five days, this sub-Arctic marine transition zone serves as an essential staging bottleneck for migrating <em>Pluvialis squatarola</em>. The wide macro-tidal flats and saltmarshes of the Kanin Peninsula region offer a rich harvest of small mollusks (<em>Macoma</em>) and crustaceans washed in by cold Barents currents. Physiologically, the bird is in transition: hormonal shifts have silenced its territorial calls, and patchy white feathers are beginning to stipple its jet-black summer belly. Having topped up its energy reserves, it waits for favorable tail-winds to vault across Finland and the Gulf of Bothnia toward the Baltic Sea.",
+        calloutPartner: "CREAF Policy & Transboundary Flyway Governance",
+        calloutText: "Migratory bottlenecks like Chesha Bay funnel birds from vast expanses of tundra into narrow coastal corridors. CREAF strengthens international policy frameworks under the AEWA (African-Eurasian Migratory Waterbird Agreement) to protect critical staging bottlenecks.",
+        calloutQuote: "“A bird knows no borders; our conservation governance must be just as connected as their flight path.” — CREAF Policy Pillar",
+        markers: [
+          {
+            coords: [46.34615, 68.35585],
+            tag: "Coastal Corridor • FID 69",
+            title: "Rounding the Kanin Peninsula",
+            body: "Flying at 78 km/h (21.7 m/s) on August 1, the <em>Pluvialis squatarola</em> navigated the windswept cape dividing the Barents and White Seas."
+          },
+          {
+            coords: [40.54121, 66.44403],
+            tag: "Staging Bottleneck • FID 72",
+            title: "White Sea & Chesha Bay Flats",
+            body: "Spent 4.8 days (115 hours) refueling on sub-Arctic intertidal shoals before launching across Fennoscandia."
+          },
+          {
+            coords: [26.26729, 66.62215],
+            tag: "Overland Sprint • FID 74",
+            title: "Crossing the Finnish Taiga",
+            body: "On August 7, the bird flew non-stop across northern Finland and the Gulf of Bothnia at speeds reaching 87.7 km/h."
+          }
+        ]
+      },
+      {
+        step: 7,
+        badge: "Chapter 07 • Baltic Crossroad",
+        title: "Crossroads of the Baltic Wind: The Limestone Meadows of Öland",
+        location: "Southern Öland & Kalmar Strait, Kalmar County, Sweden",
+        dates: "Aug 11, 2026 – Aug 15, 2026",
+        duration: "4.0 Days (#10)",
+        fixes: "48 GPS Fixes",
+        protectedArea: "Southern Öland UNESCO World Heritage & Baltic Ramsar Site",
+        center: [16.7966, 56.8150],
+        zoom: 9.8,
+        pitch: 50,
+        bearing: -12,
+        trackIndex: 81,
+        mediaUrl: "grey-plover-chapter-7.jpg",
+        mediaCredit: "Southern Öland Coastal Meadows & Kelp Shoals • Sweden Ramsar Site",
+        narrative: "Cutting southwestward across the Gulf of Bothnia and the Swedish archipelago, PLUSQU BIJ1 lands on the sun-warmed limestone shores of Öland and the Kalmar Strait on August 11. Though this stopover lasts exactly four days—the shortest of its ten primary staging chapters—it is a vital sanctuary. Unlike the macro-tidal mudflats of the Atlantic, the Baltic Sea is nearly tideless; instead, wind-driven water levels expose long ribbons of decaying bladderwrack (<em>Fucus vesiculosus</em>) and eelgrass cast onto the flat coastal meadows. Shoulder-to-shoulder with thousands of Dunlins (<em>Calidris alpina</em>), Red Knots (<em>Calidris canutus</em>), and Bar-tailed Godwits (<em>Limosa lapponica</em>) passing renowned Ottenby, our <em>Pluvialis squatarola</em> picks deftly through the fermented kelp wrack for teeming kelp fly larvae and isopods. Its primary wing feathers are now brittle and abraded after more than 9,000 kilometers of spring and summer flight—making its imminent arrival at the Wadden Sea molting grounds an urgent biological priority.",
+        calloutPartner: "European Ramsar Sites & Flyway Ringing Observatories",
+        calloutText: "Southern Öland's centuries-old pastoral grazing traditions maintain open, predator-free coastal meadows for staging waders. CREAF promotes this model of harmonious human-nature co-management—linking traditional livelihoods with biodiversity resilience.",
+        calloutQuote: "“When traditional coastal stewards thrive, the shorebirds that depend on open shorelines thrive alongside them.” — CREAF Capacity Building",
+        markers: [
+          {
+            coords: [16.32895, 57.24360],
+            tag: "Baltic Arrival • FID 82",
+            title: "Kalmar Strait Touchdown",
+            body: "Arrived on August 11 at 07:02 UTC after skirting the eastern Swedish Baltic coastline."
+          },
+          {
+            coords: [16.7966, 56.8150],
+            tag: "Micro-Habitat • FID 5829",
+            title: "Öland Wrack Beds & Meadows",
+            body: "In the micro-tidal Baltic, wind-exposed mats of decaying <em>Fucus vesiculosus</em> kelp provide super-abundant dipteran larvae for quick refueling."
+          },
+          {
+            coords: [14.85897, 56.42566],
+            tag: "Departure Vector • FID 83",
+            title: "Onward Toward the North Sea",
+            body: "On August 15, the bird departed southern Sweden, crossing Denmark overnight to reach the German Wadden Sea by 02:01 UTC."
+          }
+        ]
+      },
+      {
+        step: 8,
+        badge: "Chapter 08 • The Autumn Molt",
+        title: "Shedding the Arctic Sky: The Great Renewal of North Frisia",
+        location: "North Frisian Wadden Sea (Pellworm, Föhr & Sylt), Schleswig-Holstein, Germany",
+        dates: "Aug 19, 2026 – Sept 13, 2026",
+        duration: "25.2 Days (#3)",
+        fixes: "1,829 GPS Fixes",
+        protectedArea: "Nationalpark Schleswig-Holsteinisches Wattenmeer (UNESCO World Heritage)",
+        center: [8.7285, 54.7041],
+        zoom: 10.3,
+        pitch: 52,
+        bearing: 18,
+        trackIndex: 86,
+        mediaUrl: "grey-plover-chapter-8.jpg",
+        mediaCredit: "North Frisian Barrier Islands & Halligen • CWSS / Nationalpark Wattenmeer",
+        narrative: "Returning to the Schleswig-Holstein Wadden Sea in mid-August, PLUSQU BIJ1 settles among the expansive sandbanks and Halligen islands between Pellworm, Föhr, and Sylt for twenty-five crucial days. In spring, the Wadden Sea was a high-speed gas station; in autumn, it becomes a hospital and workshop for <em>Pluvialis squatarola</em>. Flight feathers frayed by ten thousand kilometers of wind and ultraviolet radiation must be shed and regrown from keratin up. Dropping primary flight feathers leaves the plover with ragged wing gaps, elevating its aerodynamic drag and rendering it acutely vulnerable to Peregrine Falcons (<em>Falco peregrinus</em>). Only an ecosystem of extraordinary safety—vast, unobstructed sightlines and super-abundant cockles (<em>Cerastoderma edule</em>), lugworms (<em>Arenicola marina</em>), and shore crabs—allows the bird to meet the heavy protein demand of feather synthesis while simultaneously rebuilding fat reserves. By mid-September, cloaked in fresh, silver-edged winter plumage, it is aerodynamically reborn.",
+        calloutPartner: "Common Wadden Sea Secretariat (CWSS) & Nationalpark Wattenmeer Rangers",
+        calloutText: "During the late-summer wing molt, human disturbance from boats, kite-surfers, or walkers can force waders into costly panic flights when their wing loading is highest. CWSS and national park rangers enforce protected core zones across North Frisia.",
+        calloutQuote: "“The Wadden Sea is the irreplaceable linchpin of the East Atlantic Flyway—without its safe molting flats, millions of Arctic breeders could never complete their annual cycle.” — CWSS",
+        markers: [
+          {
+            coords: [8.7285, 54.7041],
+            tag: "Molting Sanctuary • FID 6812",
+            title: "North Frisian Halligen Flats",
+            body: "1,829 GPS fixes over 25.2 days document the <em>Pluvialis squatarola</em> restricted movements between Pellworm and Föhr while replacing flight feathers."
+          },
+          {
+            coords: [9.52075, 54.04893],
+            tag: "Arrival across Jutland • FID 86",
+            title: "Night Crossing into Schleswig-Holstein",
+            body: "Crossed the neck of the Jutland peninsula at 02:01 UTC on August 16 to re-enter the Wadden Sea tidal basin."
+          },
+          {
+            coords: [7.93009, 53.99152],
+            tag: "Fresh Plumage • FID 87",
+            title: "Southbound Launch Past Helgoland",
+            body: "With newly grown primaries, PLUSQU BIJ1 departed on Sept 13 at 63.6 km/h along the Dutch and Belgian North Sea coast."
+          }
+        ]
+      },
+      {
+        step: 9,
+        badge: "Chapter 09 • Atlantic Staging",
+        title: "Crystals of Salt and Silt: The Ancient Pans of Guérande and Loire",
+        location: "Estuaire de la Loire & Baie de Bourgneuf, Pays de la Loire, France",
+        dates: "Sept 16, 2026 – Oct 2, 2026",
+        duration: "15.4 Days (#4)",
+        fixes: "1,444 GPS Fixes",
+        protectedArea: "Marais Salants de Guérande & Estuaire de la Loire Ramsar Site",
+        center: [-2.0945, 47.2820],
+        zoom: 10.3,
+        pitch: 50,
+        bearing: -22,
+        trackIndex: 107,
+        mediaUrl: "grey-plover-chapter-9.jpg",
+        mediaCredit: "Guérande Salt Pans & Bourgneuf Mudflats • Ramsar France / CREAF",
+        narrative: "Departing the Wadden Sea on September 13, PLUSQU BIJ1 executes one of the most fascinating maneuvers of its track: sweeping through the English Channel, it flies far out over the deep waters of the Bay of Biscay—nearly to the northern Spanish coast—before banking sharply northeast to settle along the Loire Estuary and Baie de Bourgneuf on September 16. Why turn back? Faced with headwinds or choosing to stage in mild Atlantic Europe rather than crossing immediately to Africa, our <em>Pluvialis squatarola</em> finds refuge across fifteen days in a timeless human-shaped wetland. Between the mudflats of Bourgneuf Bay and the ancient clay-banked salt pans of Guérande, it alternates cleanly with the tides: foraging on marine polychaetes (<em>Hediste diversicolor</em>) across open estuarine silt at low water, and roosting safely along the calm, hyper-saline artisanal salt basins when high tide floods the coast.",
+        calloutPartner: "Wetlands International & Artisanal Coastal Livelihoods",
+        calloutText: "From traditional paludiers (salt-workers) in France's Guérande marshes to women's oyster-harvesting cooperatives in Senegal's Saloum Delta, CREAF champions nature-based livelihoods where sustainable local harvesting actively maintains dike and wetland infrastructure for waterbirds.",
+        calloutQuote: "“Healthy coastal wetlands protect human settlements from storm surges while sustaining both local economies and global biodiversity.” — Wetlands International",
+        markers: [
+          {
+            coords: [-6.68964, 43.69792],
+            tag: "Oceanic Reconnaissance • FID 103",
+            title: "The Bay of Biscay Loop",
+            body: "On Sept 16 at 07:00 UTC, <em>Pluvialis squatarola</em> reached 43.70°N off northern Spain before turning 180° back toward the French Atlantic coast."
+          },
+          {
+            coords: [-2.0945, 47.2820],
+            tag: "Ramsar Staging • FID 8848",
+            title: "Loire Estuary & Bourgneuf Bay",
+            body: "1,444 GPS fixes across 15.4 days highlight intensive tidal foraging across sheltered estuarine mudflats and oyster beds."
+          },
+          {
+            coords: [-2.24907, 47.10566],
+            tag: "Human-Nature Synergy • FID 97",
+            title: "Marais Salants de Guérande",
+            body: "Traditional salt pans managed for over a millennium provide calm, predator-safe high-tide roosts when Atlantic storms lash the coast."
+          }
+        ]
+      },
+      {
+        step: 10,
+        badge: "Chapter 10 • Autumn Destination",
+        title: "Sanctuary of the Pertuis: Where the Mudflats Meet the Horizon",
+        location: "Baie de l'Aiguillon & Pertuis Charentais (Île de Ré), France",
+        dates: "Oct 2, 2026 – Oct 12, 2026+",
+        duration: "9.7+ Days (#6)",
+        fixes: "964 GPS Fixes",
+        protectedArea: "Réserve Naturelle Nationale de la Baie de l'Aiguillon / Marais Poitevin",
+        center: [-1.1493, 46.2603],
+        zoom: 11.0,
+        pitch: 55,
+        bearing: 15,
+        trackIndex: 109,
+        mediaUrl: "grey-plover-chapter-10.jpg",
+        mediaCredit: "Baie de l'Aiguillon Intertidal Mudflats • Réserve Naturelle Nationale",
+        narrative: "On the afternoon of October 2, PLUSQU BIJ1 makes a short coastal hop south into the sheltered embrace of the Baie de l'Aiguillon and the Pertuis Charentais, guarded from Atlantic swells by the Île de Ré. Here, where the Sèvre Niortaise river drains the Marais Poitevin, nearly five thousand hectares of ultra-fine, nutrient-rich mudflats shimmer under the autumn sun. As our 325-day telemetry window concludes on October 12, this resilient <em>Pluvialis squatarola</em> is thriving—methodically pacing the intertidal creeks, probing for peppery furrow shells (<em>Scrobicularia plana</em>) and mud snails (<em>Peringia ulvae</em>) alongside tens of thousands of wintering waders. Whether it chooses to overwinter here in mild Charente-Maritime or awaits a crisp November tailwind for the final 4,000-kilometer return to the Bijagós mangroves, its 16,000-kilometer odyssey proves a singular truth: from Guinea-Bissau to the Kara Sea, every wetland is a heartbeat in one indivisible planetary life-support system.",
+        calloutPartner: "The Full IKI CREAF Coalition (CWSS, Wetlands International, BirdEyes, BirdLife, IBAP & 11 African States)",
+        calloutText: "Supported by Germany's International Climate Initiative (IKI), CREAF unites scientists, policy-makers, rangers, and local communities across 33 flyway nations—restoring mangroves, protecting mudflats, and building a climate-resilient future for both people and migratory birds.",
+        calloutQuote: "“The efforts we make today shape the future of our planet.” — Emmanuel Nii Attram Taye, CREAF Partner Network",
+        markers: [
+          {
+            coords: [-1.1493, 46.2603],
+            tag: "Final Telemetry • FID 10110",
+            title: "Baie de l'Aiguillon Nature Reserve",
+            body: "One of France's premier shorebird sanctuaries, where 964 fixes on <em>Pluvialis squatarola</em> were recorded through October 12, 2026."
+          },
+          {
+            coords: [-1.2850, 46.2250],
+            tag: "Barrier Protection",
+            title: "Pertuis Breton & Île de Ré",
+            body: "Natural barrier islands shield the inner mudflats from heavy Atlantic wave energy, preserving fine sediment habitats for <em>Scrobicularia plana</em>."
+          },
+          {
+            coords: [-1.0850, 46.2950],
+            tag: "Flyway Connectivity",
+            title: "The Unbroken Chain",
+            body: "Over 325 days and 10,585 raw GPS fixes, PLUSQU BIJ1 connected UNESCO Biosphere Reserves, World Heritage Sites, and Ramsar wetlands across 5,700 km of latitude."
+          }
+        ]
+      }
+    ];
+
+    /********************************************************************
+     * 3. BUILD UI CARDS & NAVIGATION DOTS
+     ********************************************************************/
+    const storyContainer = document.getElementById('story-container');
+    const chapterNav = document.getElementById('chapter-nav');
+
+    STORY_CHAPTERS.forEach((chap, idx) => {
+      // 1. Create Right-Side Nav Dot
+      const dot = document.createElement('button');
+      dot.className = `nav-dot ${idx === 0 ? 'active' : ''}`;
+      dot.title = `Step ${chap.step}: ${chap.title}`;
+      dot.onclick = () => {
+        document.getElementById(`step-${chap.step}`).scrollIntoView({ behavior: 'smooth' });
+      };
+      chapterNav.appendChild(dot);
+
+      // 2. Create Story Step Section
+      const stepEl = document.createElement('section');
+      stepEl.id = `step-${chap.step}`;
+      stepEl.dataset.step = chap.step;
+      stepEl.className = `step ${chap.isHero ? 'step-center active' : 'step-left'}`;
+
+      if (chap.isHero) {
+        stepEl.innerHTML = `
+          <div class="story-card hero-card">
+            <div class="hero-profile-header">
+              <div class="hero-avatar-wrapper">
+                <img
+                  id="step0-portrait-img"
+                  class="hero-avatar-img"
+                  src="${STEP0_LOCAL_FILENAME}"
+                  onerror="if (this.src.indexOf('${STEP0_ALT_FILENAME}') === -1) { this.src = '${STEP0_ALT_FILENAME}'; } else { this.onerror = null; this.src = '${STEP0_FALLBACK_SVG}'; }"
+                  alt="Grey Plover PLUSQU BIJ1 with satellite tracker feeding on tropical mudflats"
+                />
+                <div class="hero-tracker-pill">
+                  <span class="tracker-dot"></span>
+                  <span>TAG 060038865</span>
+                </div>
+              </div>
+              <div>
+                <div class="hero-eyebrow">${chap.badge}</div>
+                <h1 class="hero-title">${chap.title}</h1>
+              </div>
+            </div>
+
+            <p class="hero-subtitle">${chap.subtitle}</p>
+
+            <div class="hero-stats-grid">
+              <div>
+                <div class="hero-stat-num">325</div>
+                <div class="hero-stat-label">Days Tracked</div>
+              </div>
+              <div>
+                <div class="hero-stat-num">10,585</div>
+                <div class="hero-stat-label">Raw GPS Fixes</div>
+              </div>
+              <div>
+                <div class="hero-stat-num">68.77°N</div>
+                <div class="hero-stat-label">Arctic Apex</div>
+              </div>
+              <div>
+                <div class="hero-stat-num">10</div>
+                <div class="hero-stat-label">Key Wetlands</div>
+              </div>
+            </div>
+
+            <div class="partner-strip">
+              <span class="partner-pill">Common Wadden Sea Secretariat (CWSS)</span>
+              <span class="partner-pill">Wetlands International</span>
+              <span class="partner-pill">BirdEyes (Univ. of Groningen)</span>
+              <span class="partner-pill">BirdLife International</span>
+              <span class="partner-pill">IBAP Guinea-Bissau</span>
+              <span class="partner-pill">Supported by IKI Germany</span>
+            </div>
+
+            <button class="btn-primary" onclick="document.getElementById('step-1').scrollIntoView({behavior: 'smooth'})">
+              <span>Scroll Down or Click to Begin Journey</span>
+              <span>↓</span>
+            </button>
+          </div>
+        `;
+      } else {
+        const snippetBtnsHtml = chap.markers.map((m, mIdx) => `
+          <button class="snippet-btn" onclick="openChapterMarkerPopup(${chap.step}, ${mIdx})">
+            <span>📍</span>
+            <span>${m.title}</span>
+          </button>
+        `).join('');
+
+        const diurnalBtnHtml = chap.hasDiurnalFlight ? `
+          <button class="flight-replay-btn" onclick="runThreeDayDiurnalFlight()">
+            <span>☀️🌌</span>
+            <span>Replay 3-Day (71h) Day & Night Non-Stop Flight (Bijagós → France)</span>
+          </button>
+        ` : '';
+
+        const nextStepFooterHtml = chap.step < STORY_CHAPTERS.length - 1
+          ? `<div class="next-chapter-hint" onclick="document.getElementById('step-${chap.step + 1}').scrollIntoView({behavior: 'smooth'})">
+               <span>Scroll down for Chapter ${String(chap.step + 1).padStart(2, '0')}</span>
+               <span>Next Stop ↓</span>
+             </div>`
+          : `<div class="next-chapter-hint" onclick="document.getElementById('step-0').scrollIntoView({behavior: 'smooth'})">
+               <span>End of 325-Day Telemetry Track</span>
+               <span>Back to Top ↑</span>
+             </div>`;
+
+        stepEl.innerHTML = `
+          <article class="story-card">
+            <div class="chapter-meta">
+              <span class="chapter-badge">${chap.badge}</span>
+              <span class="chapter-dates">${chap.dates}</span>
+            </div>
+
+            <h2 class="chapter-title">${chap.title}</h2>
+            <div class="chapter-location">
+              <span>🌐 ${chap.location}</span>
+            </div>
+
+            <div class="telemetry-strip">
+              <div>
+                <div class="t-cell-label">Residence</div>
+                <div class="t-cell-val">${chap.duration}</div>
+              </div>
+              <div>
+                <div class="t-cell-label">Telemetry</div>
+                <div class="t-cell-val">${chap.fixes}</div>
+              </div>
+              <div>
+                <div class="t-cell-label">Coordinates</div>
+                <div class="t-cell-val">${chap.center[1].toFixed(2)}°N, ${Math.abs(chap.center[0]).toFixed(2)}°${chap.center[0] < 0 ? 'W' : 'E'}</div>
+              </div>
+            </div>
+
+            ${diurnalBtnHtml}
+
+            <div class="media-frame">
+              <img src="${chap.mediaUrl}" alt="${chap.location}" loading="lazy" />
+              <div class="media-caption">
+                <span>${chap.mediaCredit || chap.protectedArea}</span>
+                <span>IKI CREAF</span>
+              </div>
+            </div>
+
+            <p class="chapter-narrative">${chap.narrative}</p>
+
+            <div class="conservation-callout">
+              <div class="callout-header">
+                <span>🛡️ Conservation in Action • ${chap.calloutPartner}</span>
+              </div>
+              <div class="callout-body">${chap.calloutText}</div>
+              <div class="callout-quote">${chap.calloutQuote}</div>
+            </div>
+
+            <div class="marker-snippets-section">
+              <div class="snippets-label">Interactive Telemetry & Ecological Markers (Click to Inspect on Map):</div>
+              <div class="snippet-buttons">
+                ${snippetBtnsHtml}
+              </div>
+            </div>
+
+            ${nextStepFooterHtml}
+          </article>
+        `;
+      }
+
+      storyContainer.appendChild(stepEl);
+    });
+
+    /********************************************************************
+     * 4. INITIALIZE MAPLIBRE GL JS v5 WITH 3D SPHERE GLOBE & DAWN SKY
+     ********************************************************************/
+    const mapStyle = {
+      version: 8,
+      projection: { type: "globe" },
+      sky: {
+        "sky-color": "#1e1b4b",
+        "sky-horizon-blend": 0.45,
+        "horizon-color": "#fb923c",
+        "horizon-fog-blend": 0.55,
+        "fog-color": "#f43f5e",
+        "fog-ground-blend": 0.25,
+        "atmosphere-blend": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          0, 1,
+          5, 1,
+          7, 0
+        ]
+      },
+      sources: {
+        "mapbox-satellite": {
+          type: "raster",
+          tiles: [
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          ],
+          tileSize: 256,
+          attribution: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics • Telemetry: BirdEyes / Univ. of Groningen / IKI CREAF"
+        }
+      },
+      layers: [
+        {
+          id: "satellite-basemap",
+          type: "raster",
+          source: "mapbox-satellite",
+          paint: {
+            "raster-brightness-max": 0.85,
+            "raster-brightness-min": 0.04,
+            "raster-contrast": 0.14,
+            "raster-saturation": 0.28,
+            "raster-fade-duration": 0
+          }
+        }
+      ]
+    };
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: mapStyle,
+      center: STORY_CHAPTERS[0].center,
+      zoom: STORY_CHAPTERS[0].zoom,
+      pitch: STORY_CHAPTERS[0].pitch,
+      bearing: STORY_CHAPTERS[0].bearing,
+      scrollZoom: false, // Capture scroll wheel for page scrollytelling instead of map zooming
+      antialias: true
+    });
+
+    // Ensure scroll wheel zooming on the map remains disabled so wheel events always scroll the story
+    map.scrollZoom.disable();
+
+    // Wire up custom +/- zoom buttons
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      map.zoomIn({ duration: 350 });
+    });
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      map.zoomOut({ duration: 350 });
+    });
+
+    // Helper for the floating bottom "Scroll Down" pill
+    window.scrollToNextStep = function() {
+      const nextIdx = Math.min(currentStepIndex + 1, STORY_CHAPTERS.length - 1);
+      const targetEl = document.getElementById(`step-${nextIdx}`);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+
+    // Offset the 3D Globe slightly left on Step 0 so it sits balanced beside the Hero Card
+    function getStepPadding(stepIdx) {
+      if (window.innerWidth <= 768) return { top: 0, bottom: 0, left: 0, right: 0 };
+      return stepIdx === 0
+        ? { top: 0, bottom: 0, left: 0, right: 420 }
+        : { top: 0, bottom: 0, left: 420, right: 0 };
+    }
+
+    // Generate Catmull-Rom Bezier Smoothed Flight Track via Turf.js
+    const rawCoords = RAW_TRACK_POINTS.map(pt => [pt[0], pt[1]]);
+    const rawLine = turf.lineString(rawCoords);
+    const smoothedCurve = turf.bezierSpline(rawLine, {
+      resolution: 25000,
+      sharpness: 0.55
+    });
+    const smoothCoords = smoothedCurve.geometry.coordinates;
+
+    // Precompute closest smooth index for each of the 110 raw points
+    const rawToSmoothIndex = rawCoords.map(rc => {
+      let bestIdx = 0;
+      let minDist = Infinity;
+      for (let i = 0; i < smoothCoords.length; i++) {
+        const dx = smoothCoords[i][0] - rc[0];
+        const dy = smoothCoords[i][1] - rc[1];
+        const d = dx * dx + dy * dy;
+        if (d < minDist) {
+          minDist = d;
+          bestIdx = i;
+        }
+      }
+      return bestIdx;
+    });
+
+    // Live Bird DOM Marker
+    const birdEl = document.createElement('div');
+    birdEl.className = 'plover-live-marker';
+    birdEl.innerHTML = `<span style="font-size:13px;">🐦</span>`;
+    const liveBirdMarker = new maplibregl.Marker({ element: birdEl })
+      .setLngLat(STORY_CHAPTERS[0].center)
+      .addTo(map);
+
+    let activeChapterMarkers = [];
+    let activePopup = null;
+
+    map.on('style.load', () => {
+      map.setProjection({ type: 'globe' });
+    });
+
+    map.on('load', () => {
+      map.setProjection({ type: 'globe' });
+      map.easeTo({ padding: getStepPadding(0), duration: 0 });
+
+      // 1. Full Ghost Flight Track
+      map.addSource('full-flight-track', {
+        type: 'geojson',
+        data: smoothedCurve
+      });
+
+      map.addLayer({
+        id: 'full-flight-ghost',
+        type: 'line',
+        source: 'full-flight-track',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': 2.2,
+          'line-opacity': 0.35,
+          'line-dasharray': [2, 3]
+        }
+      });
+
+      // 2. Active Animated Flight Track (Glowing Cyan + Gold core)
+      map.addSource('active-flight-track', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [smoothCoords[0], smoothCoords[1]]
+          }
+        }
+      });
+
+      map.addLayer({
+        id: 'active-flight-glow',
+        type: 'line',
+        source: 'active-flight-track',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': 9,
+          'line-blur': 6,
+          'line-opacity': 0.65
+        }
+      });
+
+      map.addLayer({
+        id: 'active-flight-core',
+        type: 'line',
+        source: 'active-flight-track',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': '#f59e0b',
+          'line-width': 3.2,
+          'line-opacity': 0.95
+        }
+      });
+
+      // 3. Telemetry GPS Fix Dots (110 points)
+      const telemetryPointsGeoJSON = {
+        type: 'FeatureCollection',
+        features: RAW_TRACK_POINTS.map((pt, i) => ({
+          type: 'Feature',
+          properties: {
+            fid: pt[2],
+            timestamp: pt[3],
+            idx: i
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [pt[0], pt[1]]
+          }
+        }))
+      };
+
+      map.addSource('telemetry-fixes', {
+        type: 'geojson',
+        data: telemetryPointsGeoJSON
+      });
+
+      map.addLayer({
+        id: 'telemetry-fixes-layer',
+        type: 'circle',
+        source: 'telemetry-fixes',
+        paint: {
+          'circle-radius': 3.5,
+          'circle-color': '#e0f2fe',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#0284c7',
+          'circle-opacity': 0.65
+        }
+      });
+
+      // Apply Step 0 Dawn Globe Lighting initially
+      applyDawnGlobeLighting();
+    });
+
+    /********************************************************************
+     * 5. GRADUAL DAY ↔ NIGHT LIGHTING ENGINE (NO DAWN/DUSK STEPS IN SAHARA)
+     ********************************************************************/
+    const STEP0_DAWN_PHASE = {
+      brightnessMax: 0.84,
+      brightnessMin: 0.05,
+      contrast: 0.14,
+      saturation: 0.32,
+      overlayBg: "radial-gradient(circle at 38% 45%, rgba(251, 146, 60, 0.22) 0%, rgba(190, 24, 93, 0.26) 55%, rgba(15, 23, 42, 0.76) 100%)",
+      wrapperBg: "radial-gradient(circle at 38% 48%, rgba(251, 146, 60, 0.44) 0%, rgba(190, 24, 93, 0.28) 38%, rgba(15, 23, 42, 0.88) 65%, #030612 100%)"
+    };
+
+    const DAY_STATE = {
+      brightnessMax: 1.0,
+      brightnessMin: 0.0,
+      contrast: 0.08,
+      saturation: 0.12
+    };
+
+    const NIGHT_STATE = {
+      brightnessMax: 0.34,
+      brightnessMin: 0.0,
+      contrast: 0.25,
+      saturation: -0.40
+    };
+
+    function applyDawnGlobeLighting() {
+      if (map.getLayer('satellite-basemap')) {
+        map.setPaintProperty('satellite-basemap', 'raster-brightness-max', STEP0_DAWN_PHASE.brightnessMax);
+        map.setPaintProperty('satellite-basemap', 'raster-brightness-min', STEP0_DAWN_PHASE.brightnessMin);
+        map.setPaintProperty('satellite-basemap', 'raster-contrast', STEP0_DAWN_PHASE.contrast);
+        map.setPaintProperty('satellite-basemap', 'raster-saturation', STEP0_DAWN_PHASE.saturation);
+      }
+      document.getElementById('diurnal-overlay').style.background = STEP0_DAWN_PHASE.overlayBg;
+      document.getElementById('map-wrapper').style.background = STEP0_DAWN_PHASE.wrapperBg;
+    }
+
+    /**
+     * Smoothly interpolates between Day (nightWeight = 0) and Night (nightWeight = 1)
+     * without any intermediate Dawn or Dusk color steps.
+     */
+    function applyBlendedDayNight(nightWeight) {
+      const w = Math.max(0, Math.min(1, nightWeight));
+      const bMax = DAY_STATE.brightnessMax + (NIGHT_STATE.brightnessMax - DAY_STATE.brightnessMax) * w;
+      const bMin = DAY_STATE.brightnessMin + (NIGHT_STATE.brightnessMin - DAY_STATE.brightnessMin) * w;
+      const contrast = DAY_STATE.contrast + (NIGHT_STATE.contrast - DAY_STATE.contrast) * w;
+      const sat = DAY_STATE.saturation + (NIGHT_STATE.saturation - DAY_STATE.saturation) * w;
+
+      if (map.getLayer('satellite-basemap')) {
+        map.setPaintProperty('satellite-basemap', 'raster-brightness-max', bMax);
+        map.setPaintProperty('satellite-basemap', 'raster-brightness-min', bMin);
+        map.setPaintProperty('satellite-basemap', 'raster-contrast', contrast);
+        map.setPaintProperty('satellite-basemap', 'raster-saturation', sat);
+      }
+
+      const centerAlpha = (0.04 + 0.44 * w).toFixed(3);
+      const edgeAlpha = (0.48 + 0.42 * w).toFixed(3);
+      document.getElementById('diurnal-overlay').style.background =
+        `radial-gradient(circle at 50% 50%, rgba(15, 23, 42, ${centerAlpha}) 25%, rgba(2, 6, 23, ${edgeAlpha}) 100%)`;
+
+      const wrapAlpha = (0.28 * (1 - w) + 0.08 * w).toFixed(3);
+      document.getElementById('map-wrapper').style.background =
+        `radial-gradient(circle at 50% 50%, rgba(56, 189, 248, ${wrapAlpha}) 0%, #02050e 80%)`;
+    }
+
+    function resetToStandardDaylight() {
+      applyBlendedDayNight(0);
+      document.getElementById('diurnal-hud').classList.remove('active');
+    }
+
+    // Animates the non-stop Bijagós (FID 1) -> Brittany (FID 29) flight across 3 days with gradual Day <-> Night waves
+    let activeFlightAnimId = null;
+
+    function runThreeDayDiurnalFlight(onCompleteCallback) {
+      if (activeFlightAnimId) cancelAnimationFrame(activeFlightAnimId);
+
+      const startSmoothIdx = rawToSmoothIndex[0];   // Bijagós (FID 1)
+      const endSmoothIdx = rawToSmoothIndex[28];    // Brittany Landfall (FID 29)
+      const totalDurationMs = 10800;                // 10.8 seconds cinematic sequence (3 days)
+      const totalCycles = 3;                        // 3 days of gradual Day <-> Night cycles
+
+      const diurnalHud = document.getElementById('diurnal-hud');
+      const cycleCounterEl = document.getElementById('diurnal-cycle-counter');
+      const phaseIconEl = document.getElementById('diurnal-icon');
+      const phaseNameEl = document.getElementById('diurnal-phase-name');
+      const progressEl = document.getElementById('diurnal-progress');
+
+      diurnalHud.classList.add('active');
+
+      // Pull camera to a sweeping mid-altitude follow perspective over West Africa -> Sahara -> Iberia -> France
+      map.flyTo({
+        center: [-11.5, 31.0],
+        zoom: 3.9,
+        pitch: 46,
+        bearing: 14,
+        padding: getStepPadding(2),
+        duration: 2400,
+        essential: true
+      });
+
+      const startTime = performance.now();
+
+      function animateFrame(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / totalDurationMs, 1.0);
+
+        // 1. Update Smoothed Flight Line & Bird Position
+        const currentSmoothIdx = Math.max(
+          2,
+          Math.floor(startSmoothIdx + (endSmoothIdx - startSmoothIdx) * progress)
+        );
+        const slicedCoords = smoothCoords.slice(0, currentSmoothIdx + 1);
+        const currentCoord = smoothCoords[currentSmoothIdx];
+
+        if (map.getSource('active-flight-track')) {
+          map.getSource('active-flight-track').setData({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: slicedCoords
+            }
+          });
+        }
+
+        liveBirdMarker.setLngLat(currentCoord);
+        document.getElementById('hud-coords').textContent =
+          `${currentCoord[1].toFixed(2)}°N, ${Math.abs(currentCoord[0]).toFixed(2)}°${currentCoord[0] < 0 ? 'W' : 'E'}`;
+
+        // 2. Smoothly and gradually blend between Day and Night using a continuous cosine wave across 3 days
+        const cycleProgress = progress * totalCycles; // 0.0 -> 3.0
+        const cycleNum = Math.min(totalCycles, Math.floor(cycleProgress) + 1);
+
+        // nightWeight smoothly oscillates 0 (Day) -> 1 (Night) -> 0 (Day) for each of the 3 days
+        const nightWeight = 0.5 * (1 - Math.cos(cycleProgress * 2 * Math.PI));
+        applyBlendedDayNight(nightWeight);
+
+        const isNightHalf = nightWeight >= 0.5;
+        cycleCounterEl.textContent = `Day ${cycleNum} / 3 (71h)`;
+        phaseIconEl.textContent = isNightHalf ? "🌌" : "☀️";
+        phaseNameEl.textContent = `Day ${cycleNum} • ${isNightHalf ? "Night Flight" : "Daylight Flight"}`;
+        progressEl.style.width = `${(progress * 100).toFixed(1)}%`;
+
+        if (progress < 1.0) {
+          activeFlightAnimId = requestAnimationFrame(animateFrame);
+        } else {
+          // Settle gently into Baie de Morlaix, Brittany (Step 2) in Daylight
+          setTimeout(() => {
+            resetToStandardDaylight();
+            const chap2 = STORY_CHAPTERS[2];
+            map.flyTo({
+              center: chap2.center,
+              zoom: chap2.zoom,
+              pitch: chap2.pitch,
+              bearing: chap2.bearing,
+              padding: getStepPadding(2),
+              speed: 0.9,
+              curve: 1.4,
+              essential: true
+            });
+            if (onCompleteCallback) onCompleteCallback();
+          }, 450);
+        }
+      }
+
+      activeFlightAnimId = requestAnimationFrame(animateFrame);
+    }
+
+    /********************************************************************
+     * 6. CHAPTER TRANSITIONS & INTERACTIVE MARKER POPUPS (WITH 📍 PINS)
+     ********************************************************************/
+    let currentStepIndex = 0;
+
+    function clearChapterMarkers() {
+      activeChapterMarkers.forEach(item => item.marker.remove());
+      activeChapterMarkers = [];
+      if (activePopup) {
+        activePopup.remove();
+        activePopup = null;
+      }
+    }
+
+    function renderChapterMarkers(chap) {
+      clearChapterMarkers();
+      if (!chap.markers) return;
+
+      chap.markers.forEach((m) => {
+        const el = document.createElement('div');
+        el.className = 'poi-marker';
+        el.innerHTML = '📍';
+        el.title = m.title;
+
+        const popupHtml = `
+          <div class="popup-tag">${m.tag}</div>
+          <div class="popup-title">${m.title}</div>
+          <div class="popup-body">${m.body}</div>
+        `;
+
+        const popup = new maplibregl.Popup({ offset: 18, closeButton: true })
+          .setHTML(popupHtml);
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat(m.coords)
+          .setPopup(popup)
+          .addTo(map);
+
+        activeChapterMarkers.push({ marker, popup, data: m });
+      });
+    }
+
+    // Triggered by clicking any of the 3 snippet buttons inside a chapter card
+    window.openChapterMarkerPopup = function(stepNum, markerIdx) {
+      const targetChap = STORY_CHAPTERS[stepNum];
+      if (!targetChap || !targetChap.markers[markerIdx]) return;
+
+      if (currentStepIndex !== stepNum) {
+        activateStep(stepNum, true);
+      }
+
+      const item = activeChapterMarkers[markerIdx];
+      if (item) {
+        activeChapterMarkers.forEach(other => {
+          if (other.popup.isOpen()) other.popup.remove();
+        });
+        map.flyTo({
+          center: item.data.coords,
+          zoom: Math.max(map.getZoom(), 11.2),
+          pitch: 56,
+          padding: getStepPadding(stepNum),
+          duration: 1400,
+          essential: true
+        });
+        item.marker.togglePopup();
+        activePopup = item.popup;
+      }
+    };
+
+    // Smoothly interpolates the flight track between any two chapters
+    function animateTrackSegment(fromRawIdx, toRawIdx, durationMs = 2200) {
+      if (activeFlightAnimId) cancelAnimationFrame(activeFlightAnimId);
+
+      const startSmooth = rawToSmoothIndex[fromRawIdx] || 0;
+      const endSmooth = rawToSmoothIndex[toRawIdx] || 0;
+      const startTime = performance.now();
+
+      function tick(now) {
+        const t = Math.min((now - startTime) / durationMs, 1.0);
+        const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        const currIdx = Math.max(
+          1,
+          Math.floor(startSmooth + (endSmooth - startSmooth) * eased)
+        );
+
+        const coordsSlice = smoothCoords.slice(0, currIdx + 1);
+        const headCoord = smoothCoords[currIdx];
+
+        if (map.getSource('active-flight-track')) {
+          map.getSource('active-flight-track').setData({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: coordsSlice
+            }
+          });
+        }
+
+        if (headCoord) {
+          liveBirdMarker.setLngLat(headCoord);
+        }
+
+        if (t < 1.0) {
+          activeFlightAnimId = requestAnimationFrame(tick);
+        }
+      }
+
+      activeFlightAnimId = requestAnimationFrame(tick);
+    }
+
+    function activateStep(stepIdx, skipAutoDiurnal = false) {
+      const prevStepIdx = currentStepIndex;
+      currentStepIndex = stepIdx;
+      const chap = STORY_CHAPTERS[stepIdx];
+
+      // Update active state on cards & nav dots
+      document.querySelectorAll('.step').forEach((el, i) => {
+        el.classList.toggle('active', i === stepIdx);
+      });
+      document.querySelectorAll('.nav-dot').forEach((el, i) => {
+        el.classList.toggle('active', i === stepIdx);
+      });
+
+      // Update floating bottom scroll prompt text & visibility
+      const scrollPromptEl = document.getElementById('scroll-prompt');
+      const scrollPromptTextEl = document.getElementById('scroll-prompt-text');
+      if (scrollPromptEl && scrollPromptTextEl) {
+        if (stepIdx >= STORY_CHAPTERS.length - 1) {
+          scrollPromptEl.classList.add('hidden');
+        } else {
+          scrollPromptEl.classList.remove('hidden');
+          scrollPromptTextEl.textContent = stepIdx === 0
+            ? "Scroll Down to Follow the Migration"
+            : `Scroll for Chapter ${String(stepIdx + 1).padStart(2, '0')} (${stepIdx + 1}/${STORY_CHAPTERS.length - 1})`;
+        }
+      }
+
+      // Update Top HUD
+      document.getElementById('hud-coords').textContent =
+        `${chap.center[1].toFixed(2)}°N, ${Math.abs(chap.center[0]).toFixed(2)}°${chap.center[0] < 0 ? 'W' : 'E'}`;
+      document.getElementById('hud-stage').textContent = chap.badge.split('•')[1]?.trim() || chap.badge;
+
+      // Render 3 interactive 📍 pin markers for this chapter
+      renderChapterMarkers(chap);
+
+      // Special Case: Step 1 -> Step 2 triggers the 3-Day (71h) Gradual Day/Night Non-Stop Flight
+      if (stepIdx === 2 && prevStepIdx === 1 && !skipAutoDiurnal) {
+        runThreeDayDiurnalFlight();
+        return;
+      }
+
+      // Step 0 uses Dawn Globe atmosphere; Steps 1..10 use crisp Daylight
+      if (stepIdx === 0) {
+        document.getElementById('diurnal-hud').classList.remove('active');
+        applyDawnGlobeLighting();
+      } else {
+        resetToStandardDaylight();
+      }
+
+      // Animate flight track smoothly from previous chapter's fix to current chapter's fix
+      const prevTrackIdx = STORY_CHAPTERS[prevStepIdx]?.trackIndex ?? 0;
+      const nextTrackIdx = chap.trackIndex ?? 0;
+      animateTrackSegment(prevTrackIdx, nextTrackIdx, 2400);
+
+      // Fly camera smoothly
+      map.flyTo({
+        center: chap.center,
+        zoom: chap.zoom,
+        pitch: chap.pitch,
+        bearing: chap.bearing,
+        padding: getStepPadding(stepIdx),
+        speed: stepIdx === 0 ? 0.8 : 0.75,
+        curve: 1.45,
+        essential: true
+      });
+    }
+
+    /********************************************************************
+     * 7. SCROLLYTELLING INTERSECTION OBSERVER
+     ********************************************************************/
+    const observerOptions = {
+      root: null,
+      rootMargin: "-35% 0px -35% 0px",
+      threshold: 0
+    };
+
+    const stepObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const stepNum = parseInt(entry.target.dataset.step, 10);
+          if (!isNaN(stepNum) && stepNum !== currentStepIndex) {
+            activateStep(stepNum);
+          }
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.step').forEach(stepEl => {
+      stepObserver.observe(stepEl);
+    });
+  </script>
+</body>
+</html>
